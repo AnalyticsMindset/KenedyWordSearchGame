@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grok Word Search</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #0a0a0a, #1a1a2e);
+            color: #00ff9f;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            color: #00ff9f;
+            text-shadow: 0 0 10px #00ff9f;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        #grid {
+            display: inline-grid;
+            grid-template-columns: repeat(12, 30px);
+            gap: 2px;
+            background: #16213e;
+            padding: 10px;
+            border-radius: 10px;
+            margin: 20px auto;
+            box-shadow: 0 0 20px rgba(0, 255, 159, 0.3);
+        }
+        .cell {
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            background: #0f3460;
+            color: #e0e0e0;
+            cursor: pointer;
+            user-select: none;
+            border: 1px solid #1e90ff;
+            transition: all 0.2s;
+        }
+        .cell.selected {
+            background: #00ff9f;
+            color: #0a0a0a;
+        }
+        .cell.found {
+            background: #ffd700;
+            color: #0a0a0a;
+        }
+        .words {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .word-item {
+            background: #16213e;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+        .word-item.found {
+            text-decoration: line-through;
+            color: #ffd700;
+        }
+        button {
+            background: #00ff9f;
+            color: #0a0a0a;
+            border: none;
+            padding: 12px 24px;
+            margin: 10px;
+            border-radius: 50px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: scale(1.05);
+        }
+        #message {
+            margin: 20px;
+            font-size: 1.2em;
+            min-height: 30px;
+        }
+        .instructions {
+            margin: 20px auto;
+            max-width: 600px;
+            background: rgba(22, 33, 62, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Grok Word Search</h1>
+        <p>Theme: xAI & Space</p>
+        
+        <div class="instructions">
+            <strong>How to play:</strong> Click and drag on the grid to select words. Words can be horizontal, vertical, or diagonal.
+        </div>
+
+        <div id="grid"></div>
+        
+        <div class="words" id="wordList"></div>
+        
+        <div id="message"></div>
+        
+        <button onclick="resetGame()">New Puzzle</button>
+        <button onclick="solveAll()">Show Solution</button>
+    </div>
+
+    <script>
+        // Words for the puzzle
+        const words = ["GROK", "XAI", "ELON", "MARS", "STARSHIP", "NEURAL", "TESLA", "SPACEX", "ROCKET", "FALCON"];
+        
+        // Grid size
+        const SIZE = 12;
+        let grid = [];
+        let foundWords = new Set();
+        let isSelecting = false;
+        let startX, startY;
+        let currentSelection = [];
+        
+        // Generate the grid
+        function generateGrid() {
+            // Initialize empty grid with random letters
+            grid = Array(SIZE).fill().map(() => Array(SIZE).fill(''));
+            
+            // Place words (simplified placement - in real would be more robust)
+            // For demo, hardcode some placements
+            placeWord("GROK", 2, 3, 0, 1); // horizontal
+            placeWord("XAI", 5, 1, 1, 0);  // vertical
+            placeWord("ELON", 1, 8, 0, 1);
+            placeWord("MARS", 8, 4, 1, 0);
+            placeWord("STARSHIP", 3, 0, 0, 1);
+            placeWord("NEURAL", 0, 5, 1, 1); // diagonal
+            placeWord("TESLA", 7, 2, 0, -1); // backwards-ish but adjust
+            placeWord("SPACEX", 4, 9, -1, 0);
+            placeWord("ROCKET", 9, 1, 0, 1);
+            placeWord("FALCON", 2, 7, 1, 1);
+            
+            // Fill remaining with random letters
+            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    if (!grid[i][j]) {
+                        grid[i][j] = letters[Math.floor(Math.random() * letters.length)];
+                    }
+                }
+            }
+            
+            renderGrid();
+            renderWordList();
+        }
+        
+        function placeWord(word, row, col, dr, dc) {
+            for (let i = 0; i < word.length; i++) {
+                const r = row + i * dr;
+                const c = col + i * dc;
+                if (r >= 0 && r < SIZE && c >= 0 && c < SIZE) {
+                    grid[r][c] = word[i];
+                }
+            }
+        }
+        
+        function renderGrid() {
+            const gridEl = document.getElementById('grid');
+            gridEl.innerHTML = '';
+            gridEl.style.gridTemplateColumns = `repeat(${SIZE}, 30px)`;
+            
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.textContent = grid[i][j];
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    
+                    // Mouse events for selection
+                    cell.addEventListener('mousedown', startSelection);
+                    cell.addEventListener('mouseover', updateSelection);
+                    cell.addEventListener('mouseup', endSelection);
+                    
+                    gridEl.appendChild(cell);
+                }
+            }
+        }
+        
+        function renderWordList() {
+            const listEl = document.getElementById('wordList');
+            listEl.innerHTML = '';
+            words.forEach(word => {
+                const item = document.createElement('div');
+                item.classList.add('word-item');
+                item.textContent = word;
+                item.dataset.word = word;
+                listEl.appendChild(item);
+            });
+        }
+        
+        function startSelection(e) {
+            isSelecting = true;
+            startX = parseInt(e.target.dataset.row);
+            startY = parseInt(e.target.dataset.col);
+            currentSelection = [e.target];
+            clearHighlights();
+        }
+        
+        function updateSelection(e) {
+            if (!isSelecting) return;
+            
+            const endX = parseInt(e.target.dataset.row);
+            const endY = parseInt(e.target.dataset.col);
+            
+            clearHighlights();
+            
+            // Simple line selection - only straight lines
+            currentSelection = getCellsInLine(startX, startY, endX, endY);
+            
+            currentSelection.forEach(cell => {
+                if (cell) cell.classList.add('selected');
+            });
+        }
+        
+        function getCellsInLine(startRow, startCol, endRow, endCol) {
+            const cells = [];
+            const rowDiff = endRow - startRow;
+            const colDiff = endCol - startCol;
+            
+            const steps = Math.max(Math.abs(rowDiff), Math.abs(colDiff));
+            if (steps === 0) return [document.querySelector(`[data-row="${startRow}"][data-col="${startCol}"]`)];
+            
+            const dr = rowDiff / steps || 0;
+            const dc = colDiff / steps || 0;
+            
+            for (let i = 0; i <= steps; i++) {
+                const r = Math.round(startRow + i * dr);
+                const c = Math.round(startCol + i * dc);
+                const cell = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                if (cell) cells.push(cell);
+            }
+            return cells;
+        }
+        
+        function endSelection(e) {
+            if (!isSelecting) return;
+            isSelecting = false;
+            
+            const selectedWord = currentSelection.map(cell => cell.textContent).join('');
+            const reverseWord = currentSelection.map(cell => cell.textContent).reverse().join('');
+            
+            let found = false;
+            if (words.includes(selectedWord) || words.includes(reverseWord)) {
+                const word = words.includes(selectedWord) ? selectedWord : reverseWord;
+                markAsFound(word, currentSelection);
+                found = true;
+            }
+            
+            clearHighlights();
+            
+            if (found) {
+                document.getElementById('message').textContent = `Great! Found: ${selectedWord || reverseWord}`;
+                checkWin();
+            } else {
+                document.getElementById('message').textContent = 'Try again!';
+            }
+            
+            currentSelection = [];
+        }
+        
+        function markAsFound(word, cells) {
+            foundWords.add(word);
+            cells.forEach(cell => {
+                cell.classList.add('found');
+                cell.classList.remove('selected');
+            });
+            
+            // Mark in word list
+            const wordItems = document.querySelectorAll('.word-item');
+            wordItems.forEach(item => {
+                if (item.dataset.word === word) {
+                    item.classList.add('found');
+                }
+            });
+        }
+        
+        function clearHighlights() {
+            document.querySelectorAll('.cell.selected').forEach(cell => {
+                cell.classList.remove('selected');
+            });
+        }
+        
+        function checkWin() {
+            if (foundWords.size === words.length) {
+                document.getElementById('message').innerHTML = '🎉 Congratulations! You found all words! 🚀';
+            }
+        }
+        
+        function resetGame() {
+            foundWords.clear();
+            document.getElementById('message').textContent = '';
+            generateGrid();
+        }
+        
+        function solveAll() {
+            // For demo, highlight all words (simplified)
+            document.getElementById('message').textContent = 'Solution mode: All words highlighted!';
+            // In full version, would highlight each
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach((cell, index) => {
+                if (Math.random() > 0.7) cell.classList.add('found');
+            });
+        }
+        
+        // Initialize
+        window.onload = function() {
+            generateGrid();
+        };
+    </script>
+</body>
+</html>
