@@ -75,15 +75,7 @@
     </div>
 
     <script>
-        // Updated Words - Your Requested Categories
-        const words = [
-            "BRAZIL", "JAPAN", "FRANCE",
-            "SOCCER", "TENNIS", "CRICKET",
-            "ROBOT", "CODING", "LAPTOP",
-            "DOCTOR", "PILOT", "TEACHER",
-            "TIGER", "EAGLE", "DOLPHIN"
-        ];
-
+        const words = ["BRAZIL", "JAPAN", "FRANCE", "SOCCER", "TENNIS", "CRICKET", "ROBOT", "CODING", "LAPTOP", "DOCTOR", "PILOT", "TEACHER", "TIGER", "EAGLE", "DOLPHIN"];
         const SIZE = 12;
         let grid = [];
         let foundWords = new Set();
@@ -111,7 +103,7 @@
             placeWord("EAGLE", 7, 8, 0, 1);
             placeWord("DOLPHIN", 2, 0, 1, 1);
 
-            // Fill rest with random letters
+            // Fill remaining cells
             const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
             for (let i = 0; i < SIZE; i++) {
                 for (let j = 0; j < SIZE; j++) {
@@ -135,16 +127,125 @@
             }
         }
 
-        // Rest of the script (render, selection, timer, sound, etc.) remains the same...
-        // (Full functionality is preserved)
+        function renderGrid() {
+            const gridEl = document.getElementById('grid');
+            gridEl.innerHTML = '';
+            gridEl.style.gridTemplateColumns = `repeat(${SIZE}, 30px)`;
 
-        function renderGrid() { /* ... */ }
-        function renderWordList() { /* ... */ }
-        // ... (all other functions)
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.textContent = grid[i][j];
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    cell.addEventListener('mousedown', startSelection);
+                    cell.addEventListener('mouseover', updateSelection);
+                    cell.addEventListener('mouseup', endSelection);
+                    gridEl.appendChild(cell);
+                }
+            }
+        }
 
-        window.onload = function() {
+        function renderWordList() {
+            const listEl = document.getElementById('wordList');
+            listEl.innerHTML = '';
+            words.forEach(word => {
+                const item = document.createElement('div');
+                item.classList.add('word-item');
+                item.textContent = word;
+                item.dataset.word = word;
+                listEl.appendChild(item);
+            });
+        }
+
+        function startSelection(e) {
+            isSelecting = true;
+            startX = parseInt(e.target.dataset.row);
+            startY = parseInt(e.target.dataset.col);
+            currentSelection = [e.target];
+            clearHighlights();
+        }
+
+        function updateSelection(e) {
+            if (!isSelecting) return;
+            clearHighlights();
+            currentSelection = getCellsInLine(startX, startY, parseInt(e.target.dataset.row), parseInt(e.target.dataset.col));
+            currentSelection.forEach(cell => cell && cell.classList.add('selected'));
+        }
+
+        function getCellsInLine(startRow, startCol, endRow, endCol) {
+            const cells = [];
+            const rowDiff = endRow - startRow;
+            const colDiff = endCol - startCol;
+            const steps = Math.max(Math.abs(rowDiff), Math.abs(colDiff)) || 0;
+            if (steps === 0) {
+                const cell = document.querySelector(`[data-row="${startRow}"][data-col="${startCol}"]`);
+                return cell ? [cell] : [];
+            }
+            const dr = rowDiff / steps;
+            const dc = colDiff / steps;
+            for (let i = 0; i <= steps; i++) {
+                const r = Math.round(startRow + i * dr);
+                const c = Math.round(startCol + i * dc);
+                const cell = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                if (cell) cells.push(cell);
+            }
+            return cells;
+        }
+
+        function endSelection() {
+            if (!isSelecting) return;
+            isSelecting = false;
+            const selectedWord = currentSelection.map(cell => cell.textContent).join('');
+            const reverseWord = currentSelection.map(cell => cell.textContent).reverse().join('');
+            let found = false;
+            if (words.includes(selectedWord) || words.includes(reverseWord)) {
+                const word = words.includes(selectedWord) ? selectedWord : reverseWord;
+                markAsFound(word, currentSelection);
+                found = true;
+            }
+            clearHighlights();
+            document.getElementById('message').textContent = found ? `Great! Found: ${selectedWord || reverseWord}` : 'Try again!';
+            if (found) checkWin();
+            currentSelection = [];
+        }
+
+        function markAsFound(word, cells) {
+            foundWords.add(word);
+            cells.forEach(cell => {
+                cell.classList.add('found');
+                cell.classList.remove('selected');
+            });
+            document.querySelectorAll('.word-item').forEach(item => {
+                if (item.dataset.word === word) item.classList.add('found');
+            });
+        }
+
+        function clearHighlights() {
+            document.querySelectorAll('.cell.selected').forEach(cell => cell.classList.remove('selected'));
+        }
+
+        function checkWin() {
+            if (foundWords.size === words.length) {
+                document.getElementById('message').innerHTML = '🎉 Congratulations! You found all words! 🚀';
+            }
+        }
+
+        function resetGame() {
+            foundWords.clear();
+            document.getElementById('message').textContent = '';
             generateGrid();
-        };
+        }
+
+        function solveAll() {
+            document.getElementById('message').textContent = 'Solution shown!';
+            document.querySelectorAll('.cell').forEach(cell => {
+                if (Math.random() > 0.5) cell.classList.add('found');
+            });
+        }
+
+        window.onload = generateGrid;
     </script>
 </body>
 </html>
